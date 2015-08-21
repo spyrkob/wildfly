@@ -23,6 +23,7 @@ package org.jboss.as.naming.deployment;
 
 import java.util.List;
 
+import org.jboss.as.naming.service.DefaultNamespaceContextSelectorService;
 import org.jboss.as.naming.service.NamingService;
 import org.jboss.as.server.deployment.Attachments;
 import org.jboss.as.server.deployment.DeploymentPhaseContext;
@@ -61,6 +62,7 @@ public class JndiNamingDependencyProcessor implements DeploymentUnitProcessor {
             serviceBuilder.addDependencies(deploymentUnit.getParent().getAttachment(Attachments.JNDI_DEPENDENCIES));
         }
         serviceBuilder.addDependency(NamingService.SERVICE_NAME);
+        serviceBuilder.addDependency(DefaultNamespaceContextSelectorService.SERVICE_NAME);
         serviceBuilder.install();
     }
 
