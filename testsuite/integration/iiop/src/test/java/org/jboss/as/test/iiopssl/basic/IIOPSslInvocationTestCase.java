@@ -24,6 +24,7 @@ package org.jboss.as.test.iiopssl.basic;
 
 import org.jboss.arquillian.container.test.api.Deployment;
 import org.jboss.arquillian.container.test.api.OperateOnDeployment;
+import org.jboss.arquillian.container.test.api.RunAsClient;
 import org.jboss.arquillian.container.test.api.TargetsContainer;
 import org.jboss.arquillian.junit.Arquillian;
 import org.jboss.as.network.NetworkUtils;
@@ -38,10 +39,15 @@ import org.junit.Assert;
 import org.junit.Test;
 import org.junit.runner.RunWith;
 
+import javax.naming.Context;
 import javax.naming.InitialContext;
 import javax.naming.NamingException;
+import javax.rmi.PortableRemoteObject;
 import javax.security.auth.login.LoginException;
+import java.io.File;
 import java.io.IOException;
+import java.net.URISyntaxException;
+import java.net.URL;
 import java.util.Properties;
 
 /**
@@ -91,6 +97,45 @@ public class IIOPSslInvocationTestCase {
     public void testSuccessfulInvocation() throws IOException, NamingException, LoginException {
         final ClientEjb ejb = client();
         Assert.assertEquals("hello", ejb.getRemoteMessage());
+    }
+
+    @Test
+    @RunAsClient
+    public void testManualLookupUsingSSLPort() throws Exception {
+        // need to use jacorb client here because openjdk implementation doesn't support SSLIOP at the moment
+        InitialContext ctx = prepareJacorbClientInitialContext();
+
+        final Object ref = ctx.lookup("IIOPSslStatelessBean");
+
+        final IIOPSslStatelessHome iiopSslStatlessHome = (IIOPSslStatelessHome) PortableRemoteObject.narrow(ref, IIOPSslStatelessHome.class);
+
+        final String reply = iiopSslStatlessHome.create().hello();
+        Assert.assertEquals("hello", reply);
+    }
+
+    private InitialContext prepareJacorbClientInitialContext() throws URISyntaxException, NamingException {
+        setUpJacorbProperties();
+
+        Properties p = new Properties();
+        p.put(Context.INITIAL_CONTEXT_FACTORY, "com.sun.jndi.cosnaming.CNCtxFactory");
+        p.put(Context.PROVIDER_URL, "corbaloc:ssliop:1.2@localhost:3629/JBoss/Naming/root");
+
+        return new InitialContext(p);
+    }
+
+    private void setUpJacorbProperties() throws URISyntaxException {
+        System.setProperty("com.sun.CORBA.ORBUseDynamicStub", "true");
+        System.setProperty("org.omg.CORBA.ORBClass", "org.jacorb.orb.ORB");
+        System.setProperty("org.omg.CORBA.ORBSingletonClass", "org.jacorb.orb.ORBSingleton");
+        System.setProperty("jacorb.security.support_ssl","on");
+        System.setProperty("jacorb.ssl.socket_factory","org.jacorb.security.ssl.sun_jsse.SSLSocketFactory");
+        System.setProperty("jacorb.ssl.server_socket_factory","org.jacorb.security.ssl.sun_jsse.SSLServerSocketFactory");
+        System.setProperty("jacorb.security.keystore_password","password");
+        System.setProperty("jacorb.security.jsse.trustees_from_ks","on");
+        System.setProperty("jacorb.security.jsse.log.verbosity","4");
+        // need to add a keystore manually. it should be put into target/test-classes directory by iiop-build.xml
+        final URL resource = Thread.currentThread().getContextClassLoader().getResource("iiop-test.keystore");
+        System.setProperty("jacorb.security.keystore", new File(resource.toURI()).getAbsolutePath());
     }
 
     private ClientEjb client() throws NamingException {

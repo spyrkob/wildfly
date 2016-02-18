@@ -32,7 +32,6 @@ public class ClientEjb {
 
     private IIOPSslStatelessHome statelessHome;
 
-
     public String getRemoteMessage() throws RemoteException {
         IIOPSslStatelessRemote ejb = statelessHome.create();
         return ejb.hello();

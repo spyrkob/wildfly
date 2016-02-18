@@ -22,6 +22,14 @@
         <jbossas.project.dir>${jbossas.ts.dir}/..</jbossas.project.dir>
     </properties>
 
+    <dependencies>
+        <dependency>
+            <groupId>org.jacorb</groupId>
+            <artifactId>jacorb</artifactId>
+            <version>3.7</version>
+        </dependency>
+    </dependencies>
+
     <profiles>
 
         <profile>

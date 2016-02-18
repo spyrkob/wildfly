@@ -59,6 +59,10 @@
                                                  keystore="$${jboss.home.dir}/standalone/configuration/${keystore.filename}"
                                                  password="${keystore.password}"/>
 
+        <!-- Until the openjdk-iiop can use ssliop protocol, need to copy the keystore to where the test can access it -->
+        <copy todir="target/test-classes">
+            <fileset file="${basedir}/target/iiop-test.keystore"/>
+        </copy>
     </target>
 
 </project>
