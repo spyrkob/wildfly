@@ -28,12 +28,12 @@ import java.util.Collection;
 import io.undertow.predicate.Predicate;
 import io.undertow.predicate.PredicateParser;
 import org.jboss.as.controller.AbstractAddStepHandler;
+import org.jboss.as.controller.AbstractRemoveStepHandler;
 import org.jboss.as.controller.AttributeDefinition;
 import org.jboss.as.controller.OperationContext;
 import org.jboss.as.controller.OperationFailedException;
 import org.jboss.as.controller.PathAddress;
 import org.jboss.as.controller.PersistentResourceDefinition;
-import org.jboss.as.controller.ServiceRemoveStepHandler;
 import org.jboss.as.controller.SimpleAttributeDefinitionBuilder;
 import org.jboss.as.controller.operations.validation.IntRangeValidator;
 import org.jboss.dmr.ModelNode;
@@ -74,12 +74,7 @@ public class FilterRefDefinition extends PersistentResourceDefinition {
         super(UndertowExtension.PATH_FILTER_REF,
                 UndertowExtension.getResolver(Constants.FILTER_REF),
                 new FilterRefAdd(),
-                new ServiceRemoveStepHandler(new FilterRefAdd()) {
-                    @Override
-                    protected ServiceName serviceName(String name, PathAddress address) {
-                        return UndertowService.getFilterRefServiceName(address, name);
-                    }
-                });
+                new FilterRefRemove());
     }
 
     @Override
@@ -132,6 +127,29 @@ public class FilterRefDefinition extends PersistentResourceDefinition {
                     .addDependency(locationService, FilterLocation.class, service.getLocation())
                     .setInitialMode(ServiceController.Mode.ACTIVE)
                     .install();
+        }
+    }
+
+    static class FilterRefRemove extends AbstractRemoveStepHandler {
+        @Override
+        protected void performRuntime(OperationContext context, ModelNode operation, ModelNode model) throws OperationFailedException {
+            if (context.isResourceServiceRestartAllowed()) {
+                final PathAddress address = context.getCurrentAddress();
+                final String name = context.getCurrentAddressValue();
+
+                context.removeService(UndertowService.getFilterRefServiceName(address, name));
+            } else {
+                context.reloadRequired();
+            }
+        }
+
+        @Override
+        protected void recoverServices(OperationContext context, ModelNode operation, ModelNode model) throws OperationFailedException {
+            if (context.isResourceServiceRestartAllowed()) {
+                new FilterRefAdd().performRuntime(context, operation, model);
+            } else {
+                context.revertReloadRequired();
+            }
         }
     }
 }
