@@ -23,7 +23,11 @@ package org.jboss.as.test.integration.management.api.web;
 
 import java.io.IOException;
 import java.net.URL;
+import java.util.List;
 import java.util.concurrent.TimeUnit;
+
+import org.jboss.arquillian.container.spi.client.container.DeploymentException;
+import org.jboss.as.test.shared.ServerReload;
 import org.jboss.logging.Logger;
 
 import org.jboss.arquillian.container.test.api.Deployer;
@@ -41,11 +45,13 @@ import org.jboss.shrinkwrap.api.ShrinkWrap;
 import org.jboss.shrinkwrap.api.asset.StringAsset;
 import org.jboss.shrinkwrap.api.spec.JavaArchive;
 import org.jboss.shrinkwrap.api.spec.WebArchive;
+import org.junit.After;
 import org.junit.Test;
 import org.junit.runner.RunWith;
 
 import static org.jboss.as.test.integration.management.util.ModelUtil.createOpNode;
 import static org.junit.Assert.assertTrue;
+import static org.junit.Assert.fail;
 
 /**
  *
@@ -78,6 +84,13 @@ public class VirtualServerTestCase extends ContainerResourceMgmtTestBase {
         war.addAsWebResource(new StringAsset("Rewrite Test"), "/rewritten/index.html");
         war.addAsWebInfResource(new StringAsset("<jboss-web><virtual-host>test</virtual-host></jboss-web>"), "jboss-web.xml");
         return war;
+    }
+
+    @After
+    public void tearDown() throws Exception {
+        if (virtualServerExists()) {
+            removeVirtualServer(true);
+        }
     }
 
     @Test
@@ -119,10 +132,70 @@ public class VirtualServerTestCase extends ContainerResourceMgmtTestBase {
 
         // undeploy form virtual server
         deployer.undeploy("vsdeployment");
+    }
 
-        // remove virtual server
-        removeVirtualServer();
+    @Test
+    public void testRuntimeRemoveHostWithFilterRef(@ArquillianResource Deployer deployer) throws Exception {
+        if (! resolveHosts()) {
+            log.info("Unable to resolve alternate server host name.");
+            return;
+        }
+        addVirtualServer();
+        ModelNode addOp = createOpNode("subsystem=undertow/server=default-server/host=test/filter-ref=x-powered-by-header", "add");
+        executeOperation(addOp);
+        removeVirtualServer(true);
+        // vsdeployment should fail because it depends on virtual host that doesn't exist any more
+        assertDeploymentFails(deployer, "vsdeployment");
+    }
 
+    @Test
+    public void testRemoveHostWithFilterRefWithReload(@ArquillianResource Deployer deployer) throws Exception {
+        if (! resolveHosts()) {
+            log.info("Unable to resolve alternate server host name.");
+            return;
+        }
+        addVirtualServer();
+        ModelNode addOp = createOpNode("subsystem=undertow/server=default-server/host=test/filter-ref=x-powered-by-header", "add");
+        executeOperation(addOp);
+        removeVirtualServer(false);
+        ServerReload.executeReloadAndWaitForCompletion(this.getModelControllerClient());
+        // vsdeployment should fail because it depends on virtual host that doesn't exist any more
+        assertDeploymentFails(deployer, "vsdeployment");
+    }
+
+    @Test
+    public void testRemoveHostWithSso(@ArquillianResource Deployer deployer) throws Exception {
+        if (! resolveHosts()) {
+            log.info("Unable to resolve alternate server host name.");
+            return;
+        }
+
+        addVirtualServer();
+        ModelNode addOp = createOpNode("subsystem=undertow/server=default-server/host=test/setting=single-sign-on", "add");
+        executeOperation(addOp);
+
+        removeVirtualServer(true);
+        // vsdeployment should fail because it depends on virtual host that doesn't exist any more
+        assertDeploymentFails(deployer, "vsdeployment");
+
+        addVirtualServer();
+        executeOperation(addOp);
+    }
+
+    private void assertDeploymentFails(@ArquillianResource Deployer deployer, String deploymentName) {
+        try {
+            deployer.deploy(deploymentName);
+            fail("Deployment should have failed");
+        } catch (Exception e) {
+            if (e instanceof DeploymentException) {
+                // deployment failed as expected - ignore
+            } else {
+                throw e;
+            }
+        } finally {
+            // need to undeploy failed deployment to clear state in Arquillian
+            deployer.undeploy(deploymentName);
+        }
     }
 
     private void addVirtualServer() throws IOException, MgmtOperationException {
@@ -139,13 +212,26 @@ public class VirtualServerTestCase extends ContainerResourceMgmtTestBase {
         //addOp.get("rewrite").add(rewrite);
 
         executeOperation(addOp);
-
     }
 
-    private void removeVirtualServer() throws IOException, MgmtOperationException {
+    private void removeVirtualServer(boolean runtime) throws IOException, MgmtOperationException {
+        ModelNode removeOp = createOpNode("subsystem=undertow/server=default-server/host=test", "remove");
+        if (runtime) {
+            removeOp.get("operation-headers").get("allow-resource-service-restart").set("true");
+        }
+        executeOperation(removeOp);
+    }
 
-        executeOperation(createOpNode("subsystem=undertow/server=default-server/host=test", "remove"));
-
+    private boolean virtualServerExists() throws IOException, MgmtOperationException {
+        ModelNode query = createOpNode("subsystem=undertow/server=default-server", "query");
+        final ModelNode response = executeOperation(query, false);
+        final List<ModelNode> modelNodes = response.get("result").get("host").asList();
+        for (ModelNode modelNode : modelNodes) {
+            if (modelNode.has("test")) {
+                return true;
+            }
+        }
+        return false;
     }
 
     private boolean resolveHosts() {
