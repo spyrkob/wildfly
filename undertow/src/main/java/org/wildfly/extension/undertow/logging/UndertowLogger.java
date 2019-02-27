@@ -410,4 +410,8 @@ public interface UndertowLogger extends BasicLogger {
     @LogMessage(level = WARN)
     @Message(id = 101, value = "Duplicate servlet mapping %s found")
     void duplicateServletMapping(String mapping);
+
+    @LogMessage(level = WARN)
+    @Message(id = 102, value = "The \"%s\" property is depracated and might be removed in future releases.")
+    void depracatedConfigurationOption(String option);
 }
