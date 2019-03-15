@@ -33,10 +33,13 @@ import org.jboss.arquillian.junit.Arquillian;
 import org.jboss.arquillian.test.api.ArquillianResource;
 import org.jboss.as.test.integration.management.util.CLIOpResult;
 import org.jboss.as.test.integration.security.common.Utils;
+import org.jboss.as.testsuite.integration.secman.servlets.MBeanPermissionServlet;
 import org.jboss.as.testsuite.integration.secman.servlets.PrintSystemPropertyServlet;
 import org.jboss.logging.Logger;
 import org.jboss.shrinkwrap.api.ShrinkWrap;
+import org.jboss.shrinkwrap.api.asset.StringAsset;
 import org.jboss.shrinkwrap.api.spec.WebArchive;
+import org.junit.After;
 import org.junit.Test;
 import org.junit.runner.RunWith;
 
@@ -66,7 +69,23 @@ public class MinimumPermissionsTestCase extends ReloadableCliTestBase {
         LOGGER.debug("Start WAR deployment");
         final WebArchive war = ShrinkWrap.create(WebArchive.class, DEPLOYMENT + ".war");
         war.addClasses(PrintSystemPropertyServlet.class);
+        war.addClass(MBeanPermissionServlet.class);
+        war.addAsWebInfResource( new StringAsset("<?xml version=\"1.0\"?>\n" +
+                "<jboss-deployment-structure xmlns=\"urn:jboss:deployment-structure:1.2\" xmlns:xsi=\"http://www.w3.org/2001/XMLSchema-instance\">\n" +
+                "<deployment>\n" +
+                "<dependencies>\n" +
+                "<module name=\"org.jboss.as.jmx\"/>\n" +
+                "</dependencies>\n" +
+                "</deployment>\n" +
+                "</jboss-deployment-structure>"), "jboss-deployment-structure.xml");
         return war;
+    }
+
+    @After
+    public void tearDown() throws Exception {
+        doCliOperation(
+                "/subsystem=security-manager/deployment-permissions=default:undefine-attribute(name=minimum-permissions)");
+        reloadServer();
     }
 
     /**
@@ -93,11 +112,6 @@ public class MinimumPermissionsTestCase extends ReloadableCliTestBase {
         reloadServer();
 
         assertPropertyNonReadable();
-
-        opResult = doCliOperation(
-                "/subsystem=security-manager/deployment-permissions=default:undefine-attribute(name=minimum-permissions)");
-        assertOperationRequiresReload(opResult);
-        reloadServer();
     }
 
     /**
@@ -113,10 +127,6 @@ public class MinimumPermissionsTestCase extends ReloadableCliTestBase {
         reloadServer();
 
         assertPropertyReadable();
-
-        doCliOperation(
-                "/subsystem=security-manager/deployment-permissions=default:undefine-attribute(name=minimum-permissions)");
-        reloadServer();
     }
 
     /**
@@ -133,10 +143,20 @@ public class MinimumPermissionsTestCase extends ReloadableCliTestBase {
         reloadServer();
 
         assertPropertyReadable();
+    }
 
+    @Test
+    public void testMBeanPerm(@ArquillianResource URL webAppURL) throws Exception {
         doCliOperation(
-                "/subsystem=security-manager/deployment-permissions=default:undefine-attribute(name=minimum-permissions)");
+                "/subsystem=security-manager/deployment-permissions=default:write-attribute(name=minimum-permissions, value=[{class=javax.management.MBeanServerPermission, name=\"createMBeanServer\"}])");
         reloadServer();
+
+        assertAbleToBuildMBeanServer();
+    }
+
+    private void assertAbleToBuildMBeanServer() throws Exception {
+        final URI sysPropUri = new URI(webAppURL.toExternalForm() + MBeanPermissionServlet.SERVLET_PATH.substring(1));
+        Utils.makeCall(sysPropUri, HttpServletResponse.SC_OK);
     }
 
     /**
