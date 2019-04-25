@@ -91,6 +91,9 @@ public class VirtualServerTestCase extends ContainerResourceMgmtTestBase {
         if (virtualServerExists()) {
             removeVirtualServer(true);
         }
+        if (testFilterExists()) {
+            removeTestFilter(true);
+        }
     }
 
     @Test
@@ -141,10 +144,13 @@ public class VirtualServerTestCase extends ContainerResourceMgmtTestBase {
             return;
         }
         addVirtualServer();
-        ModelNode addOp = createOpNode("subsystem=undertow/server=default-server/host=test/filter-ref=x-powered-by-header", "add");
+        addTestFilter();
+        ModelNode addOp = createOpNode("subsystem=undertow/server=default-server/host=test/filter-ref=test-resp-header",
+                "add");
         executeOperation(addOp);
         removeVirtualServer(true);
-        // vsdeployment should fail because it depends on virtual host that doesn't exist any more
+        // vsdeployment should fail because it depends on virtual host that doesn't
+        // exist any more
         assertDeploymentFails(deployer, "vsdeployment");
     }
 
@@ -155,7 +161,8 @@ public class VirtualServerTestCase extends ContainerResourceMgmtTestBase {
             return;
         }
         addVirtualServer();
-        ModelNode addOp = createOpNode("subsystem=undertow/server=default-server/host=test/filter-ref=x-powered-by-header", "add");
+        addTestFilter();
+        ModelNode addOp = createOpNode("subsystem=undertow/server=default-server/host=test/filter-ref=test-resp-header", "add");
         executeOperation(addOp);
         removeVirtualServer(false);
         ServerReload.executeReloadAndWaitForCompletion(this.getModelControllerClient());
@@ -232,6 +239,29 @@ public class VirtualServerTestCase extends ContainerResourceMgmtTestBase {
             }
         }
         return false;
+    }
+
+    private boolean testFilterExists() throws IOException, MgmtOperationException {
+        ModelNode query = createOpNode("subsystem=undertow/configuration=filter/response-header=test-resp-header", "query");
+        final ModelNode response = executeOperation(query, false);
+        final String filterHeaderName = response.get("result").get("header-name").asStringOrNull();
+        return filterHeaderName != null;
+    }
+
+    private void removeTestFilter(boolean runtime) throws IOException, MgmtOperationException {
+        ModelNode removeOp = createOpNode("subsystem=undertow/configuration=filter/response-header=test-resp-header", "remove");
+        if (runtime) {
+            removeOp.get("operation-headers").get("allow-resource-service-restart").set("true");
+        }
+        executeOperation(removeOp);
+    }
+
+    private void addTestFilter() throws IOException, MgmtOperationException {
+        ModelNode filterAdd = createOpNode("subsystem=undertow/configuration=filter/response-header=test-resp-header",
+                "add");
+        filterAdd.get("header-name").set("test-resp-header");
+        filterAdd.get("header-value").set("foobar");
+        executeOperation(filterAdd);
     }
 
     private boolean resolveHosts() {
