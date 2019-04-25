@@ -90,6 +90,8 @@ class HostSingleSignOnServiceHandler implements ResourceServiceHandler {
                 return hostName;
             }
         };
+        System.out.println("!!! " + this.provider.getServiceConfigurator(managerServiceName, configuration).getServiceName());
+
         this.provider.getServiceConfigurator(managerServiceName, configuration).configure(context).build(target).setInitialMode(ServiceController.Mode.ON_DEMAND).install();
 
         SingleSignOnService service = new SingleSignOnService(domain, path, httpOnly, secure, cookieName);
@@ -111,6 +113,7 @@ class HostSingleSignOnServiceHandler implements ResourceServiceHandler {
 
         ServiceName serviceName = UndertowService.ssoServiceName(serverName, hostName);
         context.removeService(serviceName.append("manager"));
+        context.removeService(serviceName.append("manager").append("installer"));
         context.removeService(HostSingleSignOnDefinition.HOST_SSO_CAPABILITY.getCapabilityServiceName(address));
     }
 }
