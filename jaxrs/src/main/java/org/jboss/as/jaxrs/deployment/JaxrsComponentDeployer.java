@@ -29,6 +29,8 @@ import java.util.Arrays;
 
 import org.jboss.as.controller.capability.CapabilityServiceSupport;
 import org.jboss.as.ee.component.Attachments;
+import org.jboss.as.ee.component.ComponentConfiguration;
+import org.jboss.as.ee.component.ComponentConfigurator;
 import org.jboss.as.ee.component.ComponentDescription;
 import org.jboss.as.ee.component.EEModuleDescription;
 import org.jboss.as.ee.component.ViewDescription;
@@ -38,8 +40,18 @@ import org.jboss.as.server.deployment.DeploymentUnit;
 import org.jboss.as.server.deployment.DeploymentUnitProcessingException;
 import org.jboss.as.server.deployment.DeploymentUnitProcessor;
 import org.jboss.as.weld.WeldCapability;
+import org.jboss.invocation.Interceptor;
+import org.jboss.invocation.InterceptorContext;
+import org.jboss.invocation.InterceptorFactory;
+import org.jboss.invocation.InterceptorFactoryContext;
 import org.jboss.modules.Module;
+import org.jboss.resteasy.spi.HttpRequest;
+import org.jboss.resteasy.spi.ResteasyProviderFactory;
+import org.jboss.resteasy.spi.validation.GeneralValidatorCDI;
 import org.jboss.resteasy.util.GetRestful;
+
+import javax.ws.rs.core.MediaType;
+import javax.ws.rs.ext.ContextResolver;
 
 /**
  * Integrates JAX-RS with managed beans and EJB's
@@ -99,6 +111,41 @@ public class JaxrsComponentDeployer implements DeploymentUnitProcessor {
             if (!GetRestful.isRootResource(componentClass)) continue;
 
             if (isInstanceOf(component, SESSION_BEAN_DESCRIPTION_CLASS_NAME)) {
+                component.getConfigurators().addFirst(new ComponentConfigurator() {
+                    @Override
+                    public void configure(DeploymentPhaseContext context, ComponentDescription description, ComponentConfiguration configuration) throws DeploymentUnitProcessingException {
+                        configuration.addComponentInterceptor(new InterceptorFactory() {
+                            @Override
+                            public Interceptor create(InterceptorFactoryContext interceptorFactoryContext) {
+                                return new Interceptor() {
+                                    private boolean validated = false;
+                                    @Override
+                                    public Object processInvocation(InterceptorContext interceptorContext) throws Exception {
+                                        if (!validated) {
+                                            validated = true;
+                                        }
+                                        ResteasyProviderFactory providerFactory = ResteasyProviderFactory.getInstance();
+                                        HttpRequest request = ResteasyProviderFactory.getContextData(HttpRequest.class);
+                                        Object instance = interceptorContext.getTarget();
+                                        ContextResolver<GeneralValidatorCDI> resolver = providerFactory.getContextResolver(GeneralValidatorCDI.class, MediaType.WILDCARD_TYPE);
+                                        GeneralValidatorCDI validator = null;
+                                        if (resolver != null)
+                                        {
+                                            validator = providerFactory.getContextResolver(GeneralValidatorCDI.class, MediaType.WILDCARD_TYPE).getContext(null);
+                                        }
+                                        if (validator != null && validator.isValidatableFromCDI(instance.getClass()))
+                                        {
+                                            validator.validate(request, instance);
+                                            validator.checkViolationsfromCDI(request);
+                                        }
+
+                                        return interceptorContext.proceed();
+                                    }
+                                };
+                            }
+                        }, 100, true);
+                    }
+                });
                 if (isInstanceOf(component, STATEFUL_SESSION_BEAN_DESCRIPTION_CLASS_NAME)) {
                     //using SFSB's as JAX-RS endpoints is not recommended, but if people really want to do it they can
 
