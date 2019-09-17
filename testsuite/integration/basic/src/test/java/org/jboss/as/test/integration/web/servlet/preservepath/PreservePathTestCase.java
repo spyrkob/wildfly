@@ -20,14 +20,8 @@ package org.jboss.as.test.integration.web.servlet.preservepath;
 import static org.jboss.as.controller.descriptions.ModelDescriptionConstants.UNDEFINE_ATTRIBUTE_OPERATION;
 import static org.jboss.as.controller.descriptions.ModelDescriptionConstants.WRITE_ATTRIBUTE_OPERATION;
 import static org.jboss.as.test.integration.management.util.ModelUtil.createOpNode;
-import static org.jboss.as.test.shared.integration.ejb.security.PermissionUtils.createPermissionsXmlAsset;
 
-import java.io.BufferedReader;
-import java.io.File;
-import java.io.FilePermission;
-import java.io.FileReader;
 import java.net.URL;
-import java.net.URLEncoder;
 
 import org.apache.http.HttpResponse;
 import org.apache.http.client.HttpClient;
@@ -40,8 +34,6 @@ import org.jboss.arquillian.test.api.ArquillianResource;
 import org.jboss.as.arquillian.container.ManagementClient;
 import org.jboss.as.test.integration.management.util.ServerReload;
 import org.jboss.as.test.integration.security.common.CoreUtils;
-import org.jboss.as.test.shared.TestSuiteEnvironment;
-import org.jboss.as.test.shared.TimeoutUtil;
 import org.jboss.dmr.ModelNode;
 import org.jboss.shrinkwrap.api.ShrinkWrap;
 import org.jboss.shrinkwrap.api.asset.UrlAsset;
@@ -62,10 +54,6 @@ public class PreservePathTestCase {
    @ArquillianResource
    private ManagementClient managementClient;
 
-   static final String tempDir = TestSuiteEnvironment.getTmpDir();
-
-   static final int TIMEOUT = TimeoutUtil.adjust(5000);
-
    @Before
    public void setUp() throws Exception {
 
@@ -80,11 +68,6 @@ public class PreservePathTestCase {
 
    @After
    public void tearDown() throws Exception {
-      File file = new File(tempDir + "/output.txt");
-      if (file.exists()) {
-         file.delete();
-      }
-
       ModelNode setPreservePathOp = createOpNode("subsystem=undertow/servlet-container=default", UNDEFINE_ATTRIBUTE_OPERATION);
       setPreservePathOp.get("name").set("preserve-path-on-forward");
       CoreUtils.applyUpdate(setPreservePathOp, managementClient.getControllerClient());
@@ -96,11 +79,9 @@ public class PreservePathTestCase {
       WebArchive war = ShrinkWrap.create(WebArchive.class);
       war.addClass(ForwardingServlet.class);
       war.addClass(PreservePathFilter.class);
+      war.addClass(HttpServletResponseMock.class);
       war.add(new UrlAsset(PreservePathTestCase.class.getResource("preserve-path.jsp")), "preserve-path.jsp");
       war.addAsWebInfResource(PreservePathTestCase.class.getPackage(), "web.xml", "web.xml");
-      war.addAsManifestResource(createPermissionsXmlAsset(
-              new FilePermission(tempDir + "/*", "write")
-      ), "permissions.xml");
 
       return war;
    }
@@ -124,16 +105,8 @@ public class PreservePathTestCase {
       setPreservePathOnForward(preservePathOnForward);
 
       HttpClient httpclient = HttpClientBuilder.create().build();
-      HttpGet httpget = new HttpGet(url.toString() + "/test?path="+ URLEncoder.encode(tempDir));
+      HttpGet httpget = new HttpGet(url.toString() + "/test");
       HttpResponse response = httpclient.execute(httpget);
-
-      long end = System.currentTimeMillis() + TIMEOUT;
-      File file = new File(tempDir + "/output.txt");
-      while ((!file.exists() || file.length() == 0) && System.currentTimeMillis() < end) {
-         Thread.sleep(100);
-      }
-      Assert.assertTrue(file + " was not created within the timeout", file.exists());
-      Assert.assertTrue(file + " is empty", file.length() > 0);
 
       final String expectedServletPath;
       final String expectedRequestURL;
@@ -150,14 +123,9 @@ public class PreservePathTestCase {
 
       final String expectedRequestURI = new URL(expectedRequestURL).getPath();
 
-      try (BufferedReader r = new BufferedReader(new FileReader(file))) {
-         String servletPath = r.readLine();
-         Assert.assertEquals("servletPath: " + expectedServletPath, servletPath);
-         String requestUrl = r.readLine();
-         Assert.assertEquals("requestUrl: " + expectedRequestURL, requestUrl);
-         String requestUri = r.readLine();
-         Assert.assertEquals("requestUri: " + expectedRequestURI, requestUri);
-      }
+      Assert.assertEquals(expectedServletPath, response.getHeaders("servletPath")[0].getValue());
+      Assert.assertEquals(expectedRequestURL, response.getHeaders("requestUrl")[0].getValue());
+      Assert.assertEquals(expectedRequestURI, response.getHeaders("requestUri")[0].getValue());
    }
 
    private void setPreservePathOnForward(Boolean preservePathOnForward) throws Exception {

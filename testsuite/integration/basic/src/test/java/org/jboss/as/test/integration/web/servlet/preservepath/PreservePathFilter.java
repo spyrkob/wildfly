@@ -22,11 +22,9 @@ import javax.servlet.FilterChain;
 import javax.servlet.ServletException;
 import javax.servlet.ServletRequest;
 import javax.servlet.ServletResponse;
-import javax.servlet.http.HttpServletRequest;
 
-import java.io.BufferedWriter;
-import java.io.File;
-import java.io.FileWriter;
+import javax.servlet.http.HttpServletRequest;
+import javax.servlet.http.HttpServletResponse;
 import java.io.IOException;
 
 public class PreservePathFilter implements Filter {
@@ -37,18 +35,15 @@ public class PreservePathFilter implements Filter {
                         ServletResponse servletResponse,
                         FilterChain filterChain) throws IOException, ServletException {
 
-      filterChain.doFilter(servletRequest, servletResponse);
+      HttpServletResponse resp = (HttpServletResponse)servletResponse;
+      HttpServletResponseMock buffer = new HttpServletResponseMock(resp);
+      filterChain.doFilter(servletRequest, buffer);
 
-      HttpServletRequest request = (HttpServletRequest) servletRequest;
+      HttpServletRequest request = (HttpServletRequest)servletRequest;
 
-      String tmpFolder = request.getParameter("path");
-      File file = new File(tmpFolder + "/output.txt");
-      file.createNewFile();
-      try( BufferedWriter bufferedWriter = new BufferedWriter(new FileWriter(file))) {
-         String text = "servletPath: " + request.getServletPath() +
-                 "\nrequestUrl: " + request.getRequestURL().toString() +
-                 "\nrequestUri: " + request.getRequestURI();
-         bufferedWriter.write(text);
-      }
+      resp.setHeader("servletPath", request.getServletPath());
+      resp.setHeader("requestUrl", request.getRequestURL().toString());
+      resp.setHeader("requestUri", request.getRequestURI());
+      resp.flushBuffer();
    }
 }
