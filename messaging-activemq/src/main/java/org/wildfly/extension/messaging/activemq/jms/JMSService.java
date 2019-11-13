@@ -33,6 +33,7 @@ import java.util.concurrent.ExecutorService;
 import java.util.concurrent.RejectedExecutionException;
 import java.util.concurrent.TimeUnit;
 
+import org.apache.activemq.artemis.core.config.HAPolicyConfiguration;
 import org.apache.activemq.artemis.core.security.ActiveMQPrincipal;
 import org.apache.activemq.artemis.core.server.ActivateCallback;
 import org.apache.activemq.artemis.core.server.ActiveMQServer;
@@ -142,6 +143,7 @@ public class JMSService implements Service<JMSServerManager> {
                     // Suppress ARTEMIS-2438
                 }
             };
+            final CountDownLatch activatedLatch = new CountDownLatch(1);
 
             activeMQServer.getValue().registerActivationFailureListener(e -> {
                 StartException se = new StartException(e);
@@ -169,8 +171,10 @@ public class JMSService implements Service<JMSServerManager> {
                         activeMQActivationController = serviceContainer.addService(ActiveMQActivationService.getServiceName(serverServiceName), new ActiveMQActivationService())
                                 .setInitialMode(Mode.ACTIVE)
                                 .install();
+                        activatedLatch.countDown();
                     } else {
                         activeMQActivationController.setMode(ACTIVE);
+                        activatedLatch.countDown();
                     }
                 }
 
@@ -208,7 +212,15 @@ public class JMSService implements Service<JMSServerManager> {
                     }
                 }
             });
+
+
             jmsServer.start();
+            // await activation if setup as replication master
+            if (activeMQServer.getValue().getConfiguration().getHAPolicyConfiguration() != null &&
+                    activeMQServer.getValue().getConfiguration().getHAPolicyConfiguration().getType() == HAPolicyConfiguration.TYPE.REPLICATED) {
+                activatedLatch.await(5, TimeUnit.SECONDS);
+            }
+
         } catch(StartException e){
             throw e;
         } catch (Throwable t) {
