@@ -22,10 +22,12 @@
 
 package org.jboss.as.ee.metadata;
 
+import java.util.ArrayList;
 import java.util.Collection;
 import java.util.Collections;
 import java.util.HashMap;
 import java.util.HashSet;
+import java.util.List;
 import java.util.Map;
 import java.util.Properties;
 import java.util.Set;
@@ -46,6 +48,7 @@ public class EJBClientDescriptorMetaData {
     private int defaultCompression;
 
     private Map<String, RemotingReceiverConfiguration> remotingReceiverConfigurations = new HashMap<String, RemotingReceiverConfiguration>();
+    private List<HttpConnectionConfiguration> httpConnectionConfigurations = new ArrayList<>();
     private Set<ClusterConfig> clusterConfigs = new HashSet<ClusterConfig>();
 
 
@@ -72,6 +75,10 @@ public class EJBClientDescriptorMetaData {
      */
     public Collection<RemotingReceiverConfiguration> getRemotingReceiverConfigurations() {
         return this.remotingReceiverConfigurations.values();
+    }
+
+    public List<HttpConnectionConfiguration> getHttpConnectionConfigurations() {
+        return httpConnectionConfigurations;
     }
 
     /**
@@ -344,6 +351,18 @@ public class EJBClientDescriptorMetaData {
         @Override
         public int hashCode() {
             return outboundConnectionRef != null ? outboundConnectionRef.hashCode() : 0;
+        }
+    }
+
+    public class HttpConnectionConfiguration {
+        private final String uri;
+
+        HttpConnectionConfiguration(final String uri) {
+            this.uri = uri;
+        }
+
+        public String getUri() {
+            return uri;
         }
     }
 }
