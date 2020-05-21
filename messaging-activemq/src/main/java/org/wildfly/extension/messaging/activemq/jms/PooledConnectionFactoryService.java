@@ -304,10 +304,10 @@ public class PooledConnectionFactoryService implements Service<Void> {
         ServiceBuilder serviceBuilder = serviceTarget.addService(serviceName, service);
         serviceBuilder.requires(MessagingServices.getCapabilityServiceName(MessagingServices.LOCAL_TRANSACTION_PROVIDER_CAPABILITY));
         serviceBuilder.addDependency(serverServiceName, ActiveMQServer.class, service.activeMQServer);
-        serviceBuilder.requires(ActiveMQActivationService.getServiceName(serverServiceName));
-        serviceBuilder.requires(JMSServices.getJmsManagerBaseServiceName(serverServiceName));
+//        serviceBuilder.requires(ActiveMQActivationService.getServiceName(serverServiceName));
+//        serviceBuilder.requires(JMSServices.getJmsManagerBaseServiceName(serverServiceName));
         // ensures that Artemis client thread pools are not stopped before any deployment depending on a pooled-connection-factory
-        serviceBuilder.requires(MessagingServices.ACTIVEMQ_CLIENT_THREAD_POOL);
+//        serviceBuilder.requires(MessagingServices.ACTIVEMQ_CLIENT_THREAD_POOL);
         serviceBuilder.setInitialMode(ServiceController.Mode.PASSIVE);
         return serviceBuilder;
     }
@@ -470,7 +470,7 @@ public class PooledConnectionFactoryService implements Service<Void> {
                             JcaSubsystemConfiguration.class, activator.getConfigInjector())
                     .addDependency(ConnectorServices.CCM_SERVICE, CachedConnectionManager.class,
                             activator.getCcmInjector());
-            sb.requires(ActiveMQActivationService.getServiceName(getActiveMQServiceName(serverName)));
+//            sb.requires(ActiveMQActivationService.getServiceName(getActiveMQServiceName(serverName)));
             sb.requires(NamingService.SERVICE_NAME);
             sb.requires(MessagingServices.getCapabilityServiceName(MessagingServices.LOCAL_TRANSACTION_PROVIDER_CAPABILITY));
             sb.requires(ConnectorServices.BOOTSTRAP_CONTEXT_SERVICE.append("default"));
