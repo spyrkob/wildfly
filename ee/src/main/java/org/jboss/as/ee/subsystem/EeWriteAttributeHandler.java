@@ -26,12 +26,22 @@ import org.jboss.as.controller.AbstractWriteAttributeHandler;
 import org.jboss.as.controller.AttributeDefinition;
 import org.jboss.as.controller.OperationContext;
 import org.jboss.as.controller.OperationFailedException;
+import org.jboss.as.controller.PathAddress;
 import org.jboss.as.controller.registry.ManagementResourceRegistration;
+import org.jboss.as.controller.registry.Resource;
 import org.jboss.as.ee.component.deployers.DefaultEarSubDeploymentsIsolationProcessor;
 import org.jboss.as.ee.structure.AnnotationPropertyReplacementProcessor;
 import org.jboss.as.ee.structure.DescriptorPropertyReplacementProcessor;
 import org.jboss.as.ee.structure.GlobalModuleDependencyProcessor;
 import org.jboss.dmr.ModelNode;
+import org.jboss.modules.ModuleIdentifier;
+
+import java.util.HashSet;
+import java.util.List;
+import java.util.Set;
+
+import static org.jboss.as.controller.descriptions.ModelDescriptionConstants.NAME;
+import static org.jboss.as.controller.descriptions.ModelDescriptionConstants.VALUE;
 
 /**
  * Handles the "write-attribute" operation for the EE subsystem.
@@ -96,5 +106,31 @@ public class EeWriteAttributeHandler extends AbstractWriteAttributeHandler<Void>
             boolean enabled = newValue.asBoolean();
             annotationPropertyReplacementProcessor.setDescriptorPropertyReplacement(enabled);
         }
+    }
+
+    @Override
+    public void execute(OperationContext context, ModelNode operation) throws OperationFailedException {
+        final String attributeName = operation.require(NAME).asString();
+        ModelNode newValue = operation.hasDefined(VALUE) ? operation.get(VALUE) : new ModelNode();
+        final Resource resource = context.readResourceForUpdate(PathAddress.EMPTY_ADDRESS);
+        final ModelNode submodel = resource.getModel();
+        final ModelNode currentValue = submodel.get(attributeName).clone();
+
+        if (attributeName.equals(GlobalModulesDefinition.GLOBAL_MODULES)) {
+            List<GlobalModulesDefinition.GlobalModule> newList = GlobalModulesDefinition.createModuleList(context, newValue);
+
+            // de-duplicate modules removing oldest to maintain changes
+            Set<ModuleIdentifier> tmp = new HashSet<>();
+            for (int i = newList.size() - 1; i >= 0; i--) {
+                GlobalModulesDefinition.GlobalModule m = newList.get(i);
+                if (tmp.contains(m.getModuleIdentifier())) {
+                    newValue.remove(i);
+                } else {
+                    tmp.add(m.getModuleIdentifier());
+                }
+            }
+        }
+        super.execute(context, operation);
+
     }
 }
