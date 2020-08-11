@@ -455,7 +455,7 @@
         <version.xml-resolver>1.2</version.xml-resolver>
         <!-- Apache xml-resolver -->
         <version.xom>1.2.10</version.xom>
-
+        <version.powermock-release-with-junit-mockito>1.6.2</version.powermock-release-with-junit-mockito>
 
     </properties>
 
