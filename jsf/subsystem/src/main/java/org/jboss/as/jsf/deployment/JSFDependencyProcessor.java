@@ -56,11 +56,10 @@ public class JSFDependencyProcessor implements DeploymentUnitProcessor {
 
     private static final ModuleIdentifier JSF_SUBSYSTEM = ModuleIdentifier.create("org.jboss.as.jsf");
 
-    private JSFModuleIdFactory moduleIdFactory;
+    private JSFModuleIdFactory moduleIdFactory = JSFModuleIdFactory.getInstance();
 
     @Override
     public void deploy(DeploymentPhaseContext phaseContext) throws DeploymentUnitProcessingException {
-        moduleIdFactory = JSFModuleIdFactory.getInstance();
         final DeploymentUnit deploymentUnit = phaseContext.getDeploymentUnit();
         final DeploymentUnit tl = deploymentUnit.getParent() == null ? deploymentUnit : deploymentUnit.getParent();
         final ModuleSpecification moduleSpecification = deploymentUnit.getAttachment(Attachments.MODULE_SPECIFICATION);
