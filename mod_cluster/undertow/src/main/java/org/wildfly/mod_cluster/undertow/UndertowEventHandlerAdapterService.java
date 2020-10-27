@@ -81,7 +81,9 @@ public class UndertowEventHandlerAdapterService implements UndertowEventListener
 
         // Initialize mod_cluster and start it now
         eventHandler.init(this.server);
-        eventHandler.start(this.server);
+        if (this.configuration.getSuspendController().getState() == State.RUNNING) {
+            eventHandler.start(this.server);
+        }
 
         // Start the periodic STATUS thread
         this.executor = Executors.newScheduledThreadPool(1, new DefaultThreadFactory(UndertowEventHandlerAdapterService.class));
@@ -171,6 +173,9 @@ public class UndertowEventHandlerAdapterService implements UndertowEventListener
     @Override
     public void run() {
         try {
+            if (this.configuration.getSuspendController().getState() != State.RUNNING) {
+                return;
+            }
             for (Engine engine : this.server.getEngines()) {
                 this.configuration.getContainerEventHandler().status(engine);
             }
@@ -185,6 +190,7 @@ public class UndertowEventHandlerAdapterService implements UndertowEventListener
             for (Context context : this.contexts) {
                 this.configuration.getContainerEventHandler().stop(context);
             }
+            this.configuration.getContainerEventHandler().stop(server);
         } finally {
             listener.done();
         }
@@ -197,6 +203,7 @@ public class UndertowEventHandlerAdapterService implements UndertowEventListener
 
     @Override
     public void resume() {
+        this.configuration.getContainerEventHandler().start(server);
         for (Context context : this.contexts) {
             this.configuration.getContainerEventHandler().start(context);
         }
