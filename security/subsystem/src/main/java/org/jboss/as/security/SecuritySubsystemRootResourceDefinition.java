@@ -155,14 +155,22 @@ public class SecuritySubsystemRootResourceDefinition extends SimpleResourceDefin
                                                              ModelNode newValue,
                                                              ModelNode oldValue) {
                 super.recordCapabilitiesAndRequirements(context, attributeDefinition, newValue, oldValue);
-                boolean shouldEnableJacc = newValue.asBoolean(attributeDefinition.getDefaultValue().asBoolean());
-                boolean wasJaccEnabled = oldValue.asBoolean(attributeDefinition.getDefaultValue().asBoolean());
-                if (!shouldEnableJacc) {
-                    context.deregisterCapability(JACC_CAPABILITY.getName());
-                } else if (!wasJaccEnabled && shouldEnableJacc) {
-                    context.registerCapability(JACC_CAPABILITY);
-                    // do not register the JACC_CAPABILITY_TOMBSTONE at this point - it will be registered on restart
-                }
+
+                 try {
+
+                     boolean shouldEnableJacc = attributeDefinition.resolveValue(context, newValue).asBoolean();
+                     boolean wasJaccEnabled = attributeDefinition.resolveValue(context, oldValue).asBoolean();
+
+                     if (!shouldEnableJacc) {
+                         context.deregisterCapability(JACC_CAPABILITY.getName());
+                     } else if (!wasJaccEnabled && shouldEnableJacc) {
+                         context.registerCapability(JACC_CAPABILITY);
+                         // do not register the JACC_CAPABILITY_TOMBSTONE at this point - it will be registered on restart
+                     }
+                 } catch (OperationFailedException e) {
+                     // TODO: handle this
+                     e.printStackTrace();
+                 }
             }
         });
     }
@@ -204,7 +212,9 @@ public class SecuritySubsystemRootResourceDefinition extends SimpleResourceDefin
             if (INITIALIZE_JACC.resolveModelAttribute(context, resource.getModel()).asBoolean()) {
                 context.registerCapability(JACC_CAPABILITY);
                 // tombstone marks the Policy being initiated and should not be removed until restart
-                context.registerCapability(JACC_CAPABILITY_TOMBSTONE);
+                if (context.isBooting()) {
+                    context.registerCapability(JACC_CAPABILITY_TOMBSTONE);
+                }
             }
         }
 
