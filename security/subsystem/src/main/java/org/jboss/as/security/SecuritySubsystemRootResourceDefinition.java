@@ -156,21 +156,24 @@ public class SecuritySubsystemRootResourceDefinition extends SimpleResourceDefin
                                                              ModelNode oldValue) {
                 super.recordCapabilitiesAndRequirements(context, attributeDefinition, newValue, oldValue);
 
-                 try {
+                boolean shouldRegister = resolveValue(context, attributeDefinition, newValue);
+                boolean registered = resolveValue(context, attributeDefinition, oldValue);
 
-                     boolean shouldEnableJacc = attributeDefinition.resolveValue(context, newValue).asBoolean();
-                     boolean wasJaccEnabled = attributeDefinition.resolveValue(context, oldValue).asBoolean();
+                if (!shouldRegister) {
+                    context.deregisterCapability(JACC_CAPABILITY.getName());
+                }
+                if (!registered && shouldRegister) {
+                    context.registerCapability(JACC_CAPABILITY);
+                    // do not register the JACC_CAPABILITY_TOMBSTONE at this point - it will be registered on restart
+                }
+            }
 
-                     if (!shouldEnableJacc) {
-                         context.deregisterCapability(JACC_CAPABILITY.getName());
-                     } else if (!wasJaccEnabled && shouldEnableJacc) {
-                         context.registerCapability(JACC_CAPABILITY);
-                         // do not register the JACC_CAPABILITY_TOMBSTONE at this point - it will be registered on restart
-                     }
-                 } catch (OperationFailedException e) {
-                     // TODO: handle this
-                     e.printStackTrace();
-                 }
+            private boolean resolveValue(OperationContext context, AttributeDefinition attributeDefinition, ModelNode node) {
+                try {
+                    return attributeDefinition.resolveValue(context, node).asBoolean();
+                } catch (OperationFailedException e) {
+                    throw new IllegalStateException(e);
+                }
             }
         });
     }
