@@ -4,4 +4,9 @@
     <copy-path src="docs/licenses/licenses.xsl" relative-to="content" target="docs/licenses/microprofile-licenses.xsl"/>
     <transform stylesheet="docs/licenses/microprofile-licenses.xsl" src="docs/licenses/microprofile-feature-pack-licenses.xml" output="docs/licenses/microprofile-feature-pack-licenses.html" feature-pack-properties="true"/>
     <delete path="docs/licenses/microprofile-licenses.xsl"/>
+    <line-endings>
+      <unix>
+        <filter pattern="docs?licenses?*" include="true"/>
+      </unix>
+    </line-endings>
 </tasks>
