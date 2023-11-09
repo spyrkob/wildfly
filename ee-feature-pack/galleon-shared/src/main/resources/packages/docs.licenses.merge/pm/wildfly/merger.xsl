@@ -1,8 +1,3 @@
-<!--
-  ~ Copyright The WildFly Authors
-  ~ SPDX-License-Identifier: Apache-2.0
-  -->
-
 <xsl:stylesheet version="1.0" xmlns:xsl="http://www.w3.org/1999/XSL/Transform" xmlns:xalan="http://xml.apache.org/xslt">
     <xsl:output method="xml" indent="yes" xalan:indent-amount="2" />
     <xsl:param name="fileList"/>
@@ -54,12 +49,10 @@
 
     <xsl:template name="substring-after-last">
         <xsl:param name="string" />
-        <xsl:param name="delimiter" />
         <xsl:choose>
-            <xsl:when test="contains($string, $delimiter)">
+            <xsl:when test="contains($string, '/')">
                 <xsl:call-template name="substring-after-last">
-                    <xsl:with-param name="string" select="substring-after($string, $delimiter)" />
-                    <xsl:with-param name="delimiter" select="$delimiter" />
+                    <xsl:with-param name="string" select="substring-after($string, '/')" />
                 </xsl:call-template>
             </xsl:when>
             <xsl:otherwise><xsl:value-of select="$string" /></xsl:otherwise>
@@ -76,7 +69,6 @@
                 <xsl:element name="source">
                     <xsl:call-template name="substring-after-last">
                         <xsl:with-param name="string" select="$fileName"/>
-                        <xsl:with-param name="delimiter" select="$fileSeparator"/>
                     </xsl:call-template>
                 </xsl:element>
             </xsl:copy>
